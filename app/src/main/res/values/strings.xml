@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">AutoDraw</string>
+    <string name="pick_image">选择图片</string>
+    <string name="start_draw">开始绘画</string>
+    <string name="pause">暂停</string>
+    <string name="resume">继续</string>
+    <string name="reset">重置</string>
+    <string name="export_image">导出图片</string>
+    <string name="export_video">录制视频</string>
+    <string name="speed">速度</string>
+    <string name="brush_size">笔刷大小</string>
+    <string name="style">风格</string>
+    <string name="edge_threshold">边缘强度</string>
+    <string name="processing">正在分析图像…</string>
+    <string name="no_image">尚未选择图片</string>
+    <string name="saved">已保存到相册</string>
+    <string name="recording_started">开始录制绘画过程</string>
+    <string name="recording_stopped">录制完成</string>
+</resources>
