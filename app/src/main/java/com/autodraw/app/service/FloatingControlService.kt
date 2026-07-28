@@ -6,14 +6,20 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.os.Build
 import android.os.IBinder
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
@@ -39,6 +45,8 @@ class FloatingControlService : Service(), DrawController.Listener {
     private lateinit var btnPause: View
     private lateinit var btnStop: View
     private lateinit var btnClose: View
+    private lateinit var btnSelectRegion: View
+    private lateinit var btnClearRegion: View
     private lateinit var tvState: TextView
     private lateinit var tvProgress: TextView
     private lateinit var progressSeek: SeekBar
@@ -53,6 +61,10 @@ class FloatingControlService : Service(), DrawController.Listener {
     private var touchX = 0f
     private var touchY = 0f
 
+    /** 框选全屏 overlay 的根视图(含 OverlayRegionView + 底部确认/取消栏)。 */
+    private var regionOverlay: View? = null
+    private var regionView: OverlayRegionView? = null
+
     override fun onCreate() {
         super.onCreate()
         startForeground()
@@ -66,6 +78,105 @@ class FloatingControlService : Service(), DrawController.Listener {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    // ---- 框选区域 overlay ----
+
+    /** 显示全屏框选 overlay:暂停绘画,在屏幕上覆盖一个可拖拽调整的矩形框。 */
+    private fun showRegionOverlay() {
+        if (regionOverlay != null) return
+        // 进入框选时先暂停,避免手势冲突
+        DrawController.pause()
+
+        val dm = resources.displayMetrics
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_LTR
+        }
+        // 1) 框选视图
+        val region = OverlayRegionView(this).apply {
+            aspect = DrawController.imageAspect.coerceAtLeast(0.1f)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+        }
+        container.addView(region)
+        regionView = region
+
+        // 2) 底部按钮栏
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#CC1F2433"))
+            setPadding(0, dp(8), 0, dp(8))
+        }
+        val hint = TextView(this).apply {
+            text = getString(R.string.region_hint)
+            setTextColor(Color.parseColor("#FFE082"))
+            setPadding(dp(12), 0, dp(12), 0)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+        }
+        val btnConfirm = Button(this).apply {
+            text = getString(R.string.region_confirm)
+            setBackgroundColor(Color.parseColor("#3F51B5"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { confirmRegion() }
+        }
+        val btnCancel = Button(this).apply {
+            text = getString(R.string.region_cancel)
+            setBackgroundColor(Color.parseColor("#607D8B"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { cancelRegion() }
+        }
+        bar.addView(hint, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        bar.addView(btnConfirm, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { marginStart = dp(8) })
+        bar.addView(btnCancel, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { marginStart = dp(8) })
+        container.addView(bar)
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0; y = 0
+        }
+        windowManager.addView(container, params)
+        regionOverlay = container
+    }
+
+    /** 确认框选:把屏幕坐标的矩形传给 DrawController。 */
+    private fun confirmRegion() {
+        val view = regionView ?: return
+        val rect = view.currentRect()
+        DrawController.setRegion(
+            DrawController.DrawRegion(rect.left, rect.top, rect.right, rect.bottom)
+        )
+        toast(getString(R.string.region_set, rect.width().toInt(), rect.height().toInt()))
+        removeRegionOverlay()
+    }
+
+    private fun cancelRegion() {
+        removeRegionOverlay()
+    }
+
+    private fun removeRegionOverlay() {
+        regionOverlay?.let { runCatching { windowManager.removeView(it) } }
+        regionOverlay = null
+        regionView = null
+    }
+
+    private fun dp(v: Int): Int =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
 
     override fun onDestroy() {
         super.onDestroy()
@@ -107,6 +218,8 @@ class FloatingControlService : Service(), DrawController.Listener {
         btnPause = v.findViewById(R.id.fab_pause)
         btnStop = v.findViewById(R.id.fab_stop)
         btnClose = v.findViewById(R.id.fab_close)
+        btnSelectRegion = v.findViewById(R.id.fab_select_region)
+        btnClearRegion = v.findViewById(R.id.fab_clear_region)
         tvState = v.findViewById(R.id.tv_state)
         tvProgress = v.findViewById(R.id.tv_progress)
         progressSeek = v.findViewById(R.id.fab_progress)
@@ -122,6 +235,11 @@ class FloatingControlService : Service(), DrawController.Listener {
         btnPause.setOnClickListener { DrawController.pause() }
         btnStop.setOnClickListener { DrawController.stop("用户停止") }
         btnClose.setOnClickListener { stopSelf() }
+        btnSelectRegion.setOnClickListener { showRegionOverlay() }
+        btnClearRegion.setOnClickListener {
+            DrawController.setRegion(null)
+            toast(getString(R.string.region_cleared))
+        }
 
         progressSeek.isEnabled = false // 只读进度
         applyTransformFromSeekbars()

@@ -41,11 +41,35 @@ object DrawController {
         val pixelsPerSec: Float = 900f   // 滑动速度
     )
 
+    /**
+     * 框选绘画区域(屏幕像素坐标)。
+     * - 非空时,[mapToScreen] 把归一化坐标 [0,1] 直接映射到此矩形内。
+     * - 此时 [Transform.scaleFactor/offsetXPx/offsetYPx] 不再生效,
+     *   仅 [Transform.pixelsPerSec] 仍控制速度。
+     */
+    data class DrawRegion(
+        val left: Float, val top: Float, val right: Float, val bottom: Float
+    ) {
+        val width: Float get() = (right - left).coerceAtLeast(1f)
+        val height: Float get() = (bottom - top).coerceAtLeast(1f)
+        val centerX: Float get() = (left + right) / 2f
+        val centerY: Float get() = (top + bottom) / 2f
+        val aspect: Float get() = width / height
+    }
+
     // ---- 状态 ----
     @Volatile var service: AccessibilityService? = null
         private set
     @Volatile private var strokes: List<Stroke> = emptyList()
     @Volatile private var transform = Transform()
+    @Volatile var drawRegion: DrawRegion? = null
+        private set
+    /**
+     * 当前轨迹对应的图片宽高比(width/height)。框选视图用它锁定调整大小时的比例。
+     * 由 [setStrokes] 顺带设置;无图片时默认 1f。
+     */
+    @Volatile var imageAspect: Float = 1f
+        private set
     @Volatile private var state: State = State.IDLE
         private set
 
@@ -86,7 +110,27 @@ object DrawController {
         listener?.onProgress(0, strokes.size, 0f)
     }
 
+    /** 设置轨迹同时设置图片宽高比(用于框选时锁定比例)。 */
+    fun setStrokes(strokes: List<Stroke>, imageWidth: Int, imageHeight: Int) {
+        setStrokes(strokes)
+        if (imageWidth > 0 && imageHeight > 0) {
+            imageAspect = (imageWidth.toFloat() / imageHeight).coerceIn(0.1f, 10f)
+        }
+    }
+
+    /** 单独设置图片宽高比(用于预设路径场景)。 */
+    fun setImageAspect(width: Int, height: Int) {
+        if (width > 0 && height > 0) {
+            imageAspect = (width.toFloat() / height).coerceIn(0.1f, 10f)
+        }
+    }
+
     fun setTransform(t: Transform) { transform = t }
+
+    /** 设置框选绘画区域(屏幕像素坐标)。传 null 清除,回到居中模式。 */
+    fun setRegion(region: DrawRegion?) {
+        drawRegion = region
+    }
 
     val currentState: State get() = state
     val hasStrokes: Boolean get() = strokes.isNotEmpty()
@@ -227,8 +271,13 @@ object DrawController {
         return len
     }
 
-    /** 归一化坐标 -> 屏幕像素坐标(居中 + 用户缩放 + 用户偏移)。 */
+    /** 归一化坐标 -> 屏幕像素坐标。优先映射到框选区域,否则居中+缩放+偏移。 */
     private fun mapToScreen(p: PointF): PointF {
+        // 优先:框选区域(把 [0,1] 直接映射到 region 矩形)
+        drawRegion?.let { r ->
+            return PointF(r.left + p.x * r.width, r.top + p.y * r.height)
+        }
+        // 回退:居中 + 用户缩放 + 用户偏移
         val s = service ?: return PointF(0f, 0f)
         val dm = s.resources.displayMetrics
         val screenW = dm.widthPixels

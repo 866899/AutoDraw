@@ -323,7 +323,7 @@ class MainActivity : AppCompatActivity() {
         btnReset.isEnabled = true
         btnExportImage.isEnabled = true
         btnExportVideo.isEnabled = true
-        DrawController.setStrokes(strokes)
+        DrawController.setStrokes(strokes, 256, 256)
         DrawController.targetPackage = null // 预设路径不限定目标应用
         Toast.makeText(this, getString(R.string.preset_loaded), Toast.LENGTH_SHORT).show()
     }
@@ -331,7 +331,7 @@ class MainActivity : AppCompatActivity() {
     /** 把当前图片转换出的轨迹传给 DrawController。 */
     private fun pushCurrentStrokesToController() {
         val r = lastResult ?: return
-        DrawController.setStrokes(r.strokes)
+        DrawController.setStrokes(r.strokes, r.width, r.height)
     }
 
     private fun openFloatingControl() {
