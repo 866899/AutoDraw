@@ -374,7 +374,9 @@ class MainActivity : AppCompatActivity() {
         val enabled = am.getEnabledAccessibilityServiceList(
             AccessibilityServiceInfo.FEEDBACK_GENERIC
         )
-        val targetCls = com.autodraw.app.service.AutoDrawAccessibilityService::class.java.simpleName
+        // ServiceInfo.name 存的是完整类名(如 com.autodraw.app.service.AutoDrawAccessibilityService),
+        // 不能用 simpleName 比较,否则永远判为未开启。
+        val targetCls = com.autodraw.app.service.AutoDrawAccessibilityService::class.java.name
         return enabled.any {
             it.resolveInfo?.serviceInfo?.let { si ->
                 si.packageName == packageName && si.name == targetCls
