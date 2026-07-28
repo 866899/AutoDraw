@@ -25,7 +25,7 @@ class DrawingView @JvmOverloads constructor(
 
     @Volatile private var mirrorSurface: Surface? = null
 
-    private val frameCallback = object : Choreographer.FrameCallback() {
+    private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             val dt = if (lastFrameNanos == 0L) 0f
                      else (frameTimeNanos - lastFrameNanos) / 1_000_000_000f
