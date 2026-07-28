@@ -37,7 +37,8 @@ class SketchExtractor(private val config: SketchConfig = SketchConfig()) {
         // blurred luminance field so the hatch lines stay smooth.
         val shadingGray = ImageProcessor.gaussianBlur(gray, w, h, config.blurRadius, 2.0f)
 
-        val strokes = ArrayList<Stroke>()
+        val inkStrokes = ArrayList<Stroke>()
+        val pencilStrokes = ArrayList<Stroke>()
 
         // 1) Outlines from edge magnitude, one pass per threshold level.
         config.thresholds.forEachIndexed { level, t ->
@@ -46,7 +47,8 @@ class SketchExtractor(private val config: SketchConfig = SketchConfig()) {
             for (poly in contours) {
                 val simplified = StrokeSimplifier.simplify(poly, config.simplifyTol)
                 if (simplified.size < config.minStrokePts) continue
-                strokes += toStroke(simplified, w, h, widthPx, Stroke.Style.INK)
+                val s = toStroke(simplified, w, h, widthPx, Stroke.Style.INK)
+                if (keepStroke(s)) inkStrokes += s
             }
         }
 
@@ -56,13 +58,23 @@ class SketchExtractor(private val config: SketchConfig = SketchConfig()) {
             for (poly in contours) {
                 val simplified = StrokeSimplifier.simplify(poly, config.simplifyTol * 1.5f)
                 if (simplified.size < config.minStrokePts) continue
-                strokes += toStroke(simplified, w, h, 0.8f, Stroke.Style.PENCIL)
+                val s = toStroke(simplified, w, h, 0.8f, Stroke.Style.PENCIL)
+                if (keepStroke(s)) pencilStrokes += s
             }
         }
 
-        // 3) Order naturally and drop degenerate single-point strokes.
-        val ordered = StrokeSorter.sort(strokes.filter { it.points.size >= 2 })
+        // 3) Merge endpoint-adjacent strokes (same style only) to cut pen lifts,
+        //    then order for natural hand travel and drop degenerate strokes.
+        val merged = StrokeMerger.merge(inkStrokes, config.mergeGap) +
+                     StrokeMerger.merge(pencilStrokes, config.mergeGap)
+        val ordered = StrokeSorter.sort(merged.filter { it.points.size >= 2 })
         return Result(ordered, w, h)
+    }
+
+    /** 长度过滤:丢弃过短的碎片笔画(去噪)。 */
+    private fun keepStroke(s: Stroke): Boolean {
+        if (config.minStrokeLength <= 0f) return true
+        return s.length >= config.minStrokeLength
     }
 
     private fun strokeWidthForLevel(level: Int, total: Int): Float {
