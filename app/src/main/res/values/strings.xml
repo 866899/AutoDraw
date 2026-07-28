@@ -16,4 +16,25 @@
     <string name="saved">已保存到相册</string>
     <string name="recording_started">开始录制绘画过程</string>
     <string name="recording_stopped">录制完成</string>
+
+    <!-- 屏幕模拟绘画(无障碍 + 悬浮窗) -->
+    <string name="screen_draw">屏幕绘画</string>
+    <string name="open_floating">打开悬浮控制</string>
+    <string name="use_preset_path">使用预设路径</string>
+    <string name="use_current_image">用当前图片轨迹</string>
+    <string name="accessibility_service_desc">AutoDraw 屏幕自动绘画:用无障碍手势在你选定的应用上模拟手指滑动,完成自动绘画。</string>
+    <string name="floating_title">AutoDraw 控制</string>
+    <string name="fab_start">开始</string>
+    <string name="fab_pause">暂停</string>
+    <string name="fab_stop">停止</string>
+    <string name="fab_close">关闭</string>
+    <string name="fab_speed">速度</string>
+    <string name="fab_scale">缩放</string>
+    <string name="fab_offset_x">X偏移</string>
+    <string name="fab_offset_y">Y偏移</string>
+    <string name="need_overlay_perm">需要“显示在其他应用上层”权限才能显示悬浮窗</string>
+    <string name="need_accessibility">请先在系统设置中开启 AutoDraw 无障碍服务</string>
+    <string name="need_strokes">请先选择图片生成轨迹,或使用预设路径</string>
+    <string name="floating_started">悬浮控制已开启,请切换到目标应用后点“开始”</string>
+    <string name="preset_loaded">已载入预设路径</string>
 </resources>

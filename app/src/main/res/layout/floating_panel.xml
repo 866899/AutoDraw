@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/panel_bg"
+    android:padding="10dp"
+    android:elevation="6dp">
+
+    <!-- 拖动条 + 标题 -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="6dp">
+
+        <View
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:background="@drawable/drag_handle" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text="@string/floating_title"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_state"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="就绪"
+            android:textColor="#FFE082"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- 进度 -->
+    <TextView
+        android:id="@+id/tv_progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 / 0  (0%)"
+        android:textColor="#E0E0E0"
+        android:textSize="11sp"
+        android:layout_marginBottom="4dp" />
+
+    <SeekBar
+        android:id="@+id/fab_progress"
+        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+        android:layout_width="220dp"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:progress="0"
+        android:layout_marginBottom="8dp" />
+
+    <!-- 控制按钮 -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="8dp">
+
+        <Button
+            android:id="@+id/fab_start"
+            style="@style/FloatingBtn"
+            android:text="@string/fab_start" />
+
+        <Button
+            android:id="@+id/fab_pause"
+            style="@style/FloatingBtn"
+            android:layout_marginStart="6dp"
+            android:text="@string/fab_pause" />
+
+        <Button
+            android:id="@+id/fab_stop"
+            style="@style/FloatingBtn"
+            android:layout_marginStart="6dp"
+            android:text="@string/fab_stop" />
+
+        <Button
+            android:id="@+id/fab_close"
+            style="@style/FloatingBtn"
+            android:layout_marginStart="6dp"
+            android:text="@string/fab_close" />
+    </LinearLayout>
+
+    <!-- 速度 -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="2dp">
+
+        <TextView
+            android:layout_width="56dp"
+            android:layout_height="wrap_content"
+            android:text="@string/fab_speed"
+            android:textColor="#E0E0E0"
+            android:textSize="11sp" />
+
+        <SeekBar
+            android:id="@+id/fab_speed"
+            android:layout_width="164dp"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="50" />
+    </LinearLayout>
+
+    <!-- 缩放 -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="2dp">
+
+        <TextView
+            android:layout_width="56dp"
+            android:layout_height="wrap_content"
+            android:text="@string/fab_scale"
+            android:textColor="#E0E0E0"
+            android:textSize="11sp" />
+
+        <SeekBar
+            android:id="@+id/fab_scale"
+            android:layout_width="164dp"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="50" />
+    </LinearLayout>
+
+    <!-- X 偏移 -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="2dp">
+
+        <TextView
+            android:layout_width="56dp"
+            android:layout_height="wrap_content"
+            android:text="@string/fab_offset_x"
+            android:textColor="#E0E0E0"
+            android:textSize="11sp" />
+
+        <SeekBar
+            android:id="@+id/fab_offset_x"
+            android:layout_width="164dp"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="50" />
+    </LinearLayout>
+
+    <!-- Y 偏移 -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="56dp"
+            android:layout_height="wrap_content"
+            android:text="@string/fab_offset_y"
+            android:textColor="#E0E0E0"
+            android:textSize="11sp" />
+
+        <SeekBar
+            android:id="@+id/fab_offset_y"
+            android:layout_width="164dp"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="50" />
+    </LinearLayout>
+
+</LinearLayout>

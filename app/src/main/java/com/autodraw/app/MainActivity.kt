@@ -1,6 +1,8 @@
 package com.autodraw.app
 
 import android.Manifest
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -8,6 +10,8 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import android.view.accessibility.AccessibilityManager
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,6 +23,9 @@ import com.autodraw.app.export.ImageExporter
 import com.autodraw.app.export.VideoExporter
 import com.autodraw.app.image.SketchConfig
 import com.autodraw.app.image.SketchExtractor
+import com.autodraw.app.service.DrawController
+import com.autodraw.app.service.FloatingControlService
+import com.autodraw.app.service.PresetPaths
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -37,6 +44,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnReset: com.google.android.material.button.MaterialButton
     private lateinit var btnExportImage: com.google.android.material.button.MaterialButton
     private lateinit var btnExportVideo: com.google.android.material.button.MaterialButton
+    private lateinit var btnPreset: com.google.android.material.button.MaterialButton
+    private lateinit var btnFloating: com.google.android.material.button.MaterialButton
 
     private val extractor = SketchExtractor(SketchConfig())
     private var sourceBitmap: Bitmap? = null
@@ -70,6 +79,8 @@ class MainActivity : AppCompatActivity() {
         btnReset = findViewById(R.id.btnReset)
         btnExportImage = findViewById(R.id.btnExportImage)
         btnExportVideo = findViewById(R.id.btnExportVideo)
+        btnPreset = findViewById(R.id.btnPreset)
+        btnFloating = findViewById(R.id.btnFloating)
 
         wireControls()
         wireEngine()
@@ -104,6 +115,10 @@ class MainActivity : AppCompatActivity() {
         btnExportImage.setOnClickListener { tryExportImage() }
 
         btnExportVideo.setOnClickListener { exportVideo() }
+
+        btnPreset.setOnClickListener { loadPresetPath() }
+
+        btnFloating.setOnClickListener { openFloatingControl() }
 
         speedSeek.setOnSeekBarChangeListener(simpleSeek { progress ->
             // 0..100 -> 120..2400 points/sec
@@ -292,6 +307,79 @@ class MainActivity : AppCompatActivity() {
             val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sample }
             contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, decodeOpts) }
         } catch (e: Exception) { null }
+    }
+
+    // ---- 屏幕模拟绘画(无障碍 + 悬浮窗) ----
+
+    /** 载入预设路径并显示在画布上,同时传给 DrawController。 */
+    private fun loadPresetPath() {
+        val strokes = PresetPaths.heart()
+        // 让画布也展示这条路径(用一个小占位 image 尺寸)
+        drawingView.engine.setStrokes(strokes, 256, 256)
+        drawingView.resetAnimation()
+        lastResult = SketchExtractor.Result(strokes, 256, 256)
+        progressSeek.progress = 0
+        btnStart.isEnabled = true
+        btnReset.isEnabled = true
+        btnExportImage.isEnabled = true
+        btnExportVideo.isEnabled = true
+        DrawController.setStrokes(strokes)
+        DrawController.targetPackage = null // 预设路径不限定目标应用
+        Toast.makeText(this, getString(R.string.preset_loaded), Toast.LENGTH_SHORT).show()
+    }
+
+    /** 把当前图片转换出的轨迹传给 DrawController。 */
+    private fun pushCurrentStrokesToController() {
+        val r = lastResult ?: return
+        DrawController.setStrokes(r.strokes)
+    }
+
+    private fun openFloatingControl() {
+        // 1) 悬浮窗权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, getString(R.string.need_overlay_perm), Toast.LENGTH_LONG).show()
+            startActivity(Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            ))
+            return
+        }
+        // 2) 无障碍权限
+        if (!isAccessibilityEnabled()) {
+            Toast.makeText(this, getString(R.string.need_accessibility), Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            return
+        }
+        // 3) 至少要有轨迹:优先用当前图片轨迹,否则用预设
+        if (lastResult == null) {
+            loadPresetPath()
+        } else {
+            pushCurrentStrokesToController()
+        }
+        if (!DrawController.hasStrokes) {
+            Toast.makeText(this, getString(R.string.need_strokes), Toast.LENGTH_LONG).show()
+            return
+        }
+        // 启动悬浮控制前台服务
+        val intent = Intent(this, FloatingControlService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent)
+        else startService(intent)
+        Toast.makeText(this, getString(R.string.floating_started), Toast.LENGTH_LONG).show()
+    }
+
+    /** 检查本应用的无障碍服务是否已开启。 */
+    private fun isAccessibilityEnabled(): Boolean {
+        val am = getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        if (!am.isEnabled) return false
+        val enabled = am.getEnabledAccessibilityServiceList(
+            AccessibilityServiceInfo.FEEDBACK_GENERIC
+        )
+        val targetCls = com.autodraw.app.service.AutoDrawAccessibilityService::class.java.simpleName
+        return enabled.any {
+            it.resolveInfo?.serviceInfo?.let { si ->
+                si.packageName == packageName && si.name == targetCls
+            } ?: false
+        }
     }
 
     private fun simpleSeek(onProgress: (Int) -> Unit) =
