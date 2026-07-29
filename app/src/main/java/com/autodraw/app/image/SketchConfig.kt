@@ -22,6 +22,16 @@ package com.autodraw.app.image
  * @param mergeGap        Max normalized endpoint distance at which two strokes
  *                        of the same style are merged into one continuous stroke
  *                        (repairs contour breaks, reduces pen lifts). 0 disables.
+ * @param subjectBoost    活物区域增强开关。开启后对识别到的活物(人脸/动物)区域:
+ *                        ①加密等值线层数(subjectExtraLevels 层);
+ *                        ②减小简化容差(× subjectSimplifyScale);
+ *                        ③更粗笔画(× subjectWidthScale);
+ *                        ④追加五官结构引导笔画(眼/眉/鼻/嘴轮廓)。
+ * @param subjectExtraLevels 活物区域在 [thresholds] 基础上额外叠加的等值线层数。
+ * @param subjectSimplifyScale 活物区域内 RDP 容差缩放系数(<1 保留更多细节)。
+ * @param subjectWidthScale   活物区域内笔画宽度缩放系数(>1 突出强调)。
+ * @param subjectLabel   活物区域内阴影笔画是否启用(突出主体时通常关闭背景阴影,
+ *                        仅在活物内保留)。true:仅活物内保留阴影。
  */
 data class SketchConfig(
     val longSide: Int = 384,
@@ -31,5 +41,10 @@ data class SketchConfig(
     val simplifyTol: Float = 0.010f,
     val minStrokePts: Int = 3,
     val minStrokeLength: Float = 0.012f,
-    val mergeGap: Float = 0.012f
+    val mergeGap: Float = 0.012f,
+    val subjectBoost: Boolean = false,
+    val subjectExtraLevels: Int = 2,
+    val subjectSimplifyScale: Float = 0.5f,
+    val subjectWidthScale: Float = 1.3f,
+    val subjectOnlyShade: Boolean = true
 )

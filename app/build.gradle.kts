@@ -11,11 +11,17 @@ android {
         applicationId = "com.autodraw.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.5"
+        versionCode = 6
+        versionName = "1.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+
+        // ML Kit face-detection 携带 native 库(每 ABI ~16MB)。
+        // 只保留真实手机架构,排除 x86/x86_64(模拟器用),APK 体积减半。
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
@@ -49,6 +55,10 @@ dependencies {
 
     // Coroutines for async image processing
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // ML Kit — 活物识别(人脸 + 图像标注)
+    implementation("com.google.mlkit:face-detection:16.1.5")
+    implementation("com.google.mlkit:image-labeling:17.0.7")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

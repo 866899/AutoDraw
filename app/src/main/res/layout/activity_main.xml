@@ -24,6 +24,12 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
+        <com.autodraw.app.image.SubjectOverlayView
+            android:id="@+id/subjectOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
         <ProgressBar
             android:id="@+id/progressBar"
             style="?android:attr/progressBarStyleLarge"
@@ -188,6 +194,14 @@
             android:layout_height="wrap_content"
             android:text="@string/style"
             android:checked="true" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/subjectSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="@string/subject_boost"
+            android:checked="false" />
     </LinearLayout>
 
 </LinearLayout>

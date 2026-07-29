@@ -44,4 +44,7 @@
     <string name="need_strokes">请先选择图片生成轨迹,或使用预设路径</string>
     <string name="floating_started">悬浮控制已开启,请切换到目标应用后点“开始”</string>
     <string name="preset_loaded">已载入预设路径</string>
+
+    <!-- 活物识别增强 -->
+    <string name="subject_boost">活物增强</string>
 </resources>

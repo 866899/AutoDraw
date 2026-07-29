@@ -23,6 +23,9 @@ import com.autodraw.app.export.ImageExporter
 import com.autodraw.app.export.VideoExporter
 import com.autodraw.app.image.SketchConfig
 import com.autodraw.app.image.SketchExtractor
+import com.autodraw.app.image.SubjectDetector
+import com.autodraw.app.image.SubjectOverlayView
+import com.autodraw.app.image.SubjectRegions
 import com.autodraw.app.service.DrawController
 import com.autodraw.app.service.FloatingControlService
 import com.autodraw.app.service.PresetPaths
@@ -46,6 +49,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnExportVideo: com.google.android.material.button.MaterialButton
     private lateinit var btnPreset: com.google.android.material.button.MaterialButton
     private lateinit var btnFloating: com.google.android.material.button.MaterialButton
+    private lateinit var subjectSwitch: com.google.android.material.switchmaterial.SwitchMaterial
+    private lateinit var subjectOverlay: SubjectOverlayView
 
     private val extractor = SketchExtractor(SketchConfig())
     private var sourceBitmap: Bitmap? = null
@@ -81,6 +86,8 @@ class MainActivity : AppCompatActivity() {
         btnExportVideo = findViewById(R.id.btnExportVideo)
         btnPreset = findViewById(R.id.btnPreset)
         btnFloating = findViewById(R.id.btnFloating)
+        subjectSwitch = findViewById(R.id.subjectSwitch)
+        subjectOverlay = findViewById(R.id.subjectOverlay)
 
         wireControls()
         wireEngine()
@@ -151,6 +158,7 @@ class MainActivity : AppCompatActivity() {
         })
 
         shadeSwitch.setOnCheckedChangeListener { _, _ -> reprocess() }
+        subjectSwitch.setOnCheckedChangeListener { _, _ -> reprocess() }
     }
 
     private fun wireEngine() {
@@ -201,14 +209,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun processInternal(src: Bitmap) {
+        val boost = subjectSwitch.isChecked
         val config = SketchConfig(
-            shadingLevels = if (shadeSwitch.isChecked) listOf(0.32f, 0.55f) else emptyList()
+            shadingLevels = if (shadeSwitch.isChecked) listOf(0.32f, 0.55f) else emptyList(),
+            subjectBoost = boost
         )
+        // 活物识别(开启时):ML Kit 在 IO 线程检测,再交给 SketchExtractor
+        val regions = if (boost) {
+            withContext(Dispatchers.IO) {
+                runCatching { SubjectDetector.detect(src) }.getOrDefault(SubjectRegions.EMPTY)
+            }
+        } else null
+
         val result = withContext(Dispatchers.IO) {
-            SketchExtractor(config).extract(src)
+            SketchExtractor(config).extract(src, regions)
         }
         lastResult = result
         runOnUiThread {
+            // 显示识别结果叠加
+            if (boost && regions != null && regions.hasSubjects) {
+                val aspect = result.width.toFloat() / result.height
+                subjectOverlay.setSubjects(regions, aspect)
+                subjectOverlay.visibility = android.view.View.VISIBLE
+            } else {
+                subjectOverlay.visibility = android.view.View.GONE
+            }
             drawingView.engine.setStrokes(result.strokes, result.width, result.height)
             drawingView.resetAnimation()
             progressBar.visibility = android.view.View.GONE
@@ -217,11 +242,15 @@ class MainActivity : AppCompatActivity() {
             btnExportImage.isEnabled = true
             btnExportVideo.isEnabled = true
             progressSeek.progress = 0
-            Toast.makeText(
-                this@MainActivity,
-                "已生成 ${result.strokes.size} 条笔触",
-                Toast.LENGTH_SHORT
-            ).show()
+            val msg = if (boost && regions != null && regions.hasSubjects) {
+                val n = regions.boxes.size
+                "识别到 $n 个活物,已增强该区域;共 ${result.strokes.size} 条笔触"
+            } else if (boost) {
+                "未识别到活物,按普通模式生成 ${result.strokes.size} 条笔触"
+            } else {
+                "已生成 ${result.strokes.size} 条笔触"
+            }
+            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
         }
     }
 
