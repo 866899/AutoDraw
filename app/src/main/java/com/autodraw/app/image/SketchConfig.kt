@@ -32,6 +32,12 @@ package com.autodraw.app.image
  * @param subjectWidthScale   活物区域内笔画宽度缩放系数(>1 突出强调)。
  * @param subjectLabel   活物区域内阴影笔画是否启用(突出主体时通常关闭背景阴影,
  *                        仅在活物内保留)。true:仅活物内保留阴影。
+ * @param hairBoost      头部增强开关。开启后,对由人脸框上方推导出的"头发区域"
+ *                       (额头上方一定范围内)同样应用加密等值线 + 更小简化容差,
+ *                       让发丝/发际线轮廓更清晰。ML Kit 不提供头发轮廓,此为
+ *                       基于人脸框的启发式区域加权。
+ * @param hairTopRatio   头发区域向上扩展占人脸高度的比例(0.6 表示再向上扩 60%)。
+ * @param hairSideRatio  头发区域左右扩展占人脸宽度的比例(0.1 表示两侧各扩 10%)。
  */
 data class SketchConfig(
     val longSide: Int = 384,
@@ -46,5 +52,8 @@ data class SketchConfig(
     val subjectExtraLevels: Int = 2,
     val subjectSimplifyScale: Float = 0.5f,
     val subjectWidthScale: Float = 1.3f,
-    val subjectOnlyShade: Boolean = true
+    val subjectOnlyShade: Boolean = true,
+    val hairBoost: Boolean = true,
+    val hairTopRatio: Float = 0.6f,
+    val hairSideRatio: Float = 0.1f
 )

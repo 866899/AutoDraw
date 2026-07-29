@@ -103,6 +103,8 @@ object SubjectDetector {
             rightEye = contour(face, FaceContour.RIGHT_EYE, w, h),
             leftBrow = contour(face, FaceContour.LEFT_EYEBROW_TOP, w, h),
             rightBrow = contour(face, FaceContour.RIGHT_EYEBROW_TOP, w, h),
+            leftBrowBottom = contour(face, FaceContour.LEFT_EYEBROW_BOTTOM, w, h),
+            rightBrowBottom = contour(face, FaceContour.RIGHT_EYEBROW_BOTTOM, w, h),
             noseBridge = contour(face, FaceContour.NOSE_BRIDGE, w, h),
             upperLip = contour(face, FaceContour.UPPER_LIP_TOP, w, h),
             lowerLip = contour(face, FaceContour.LOWER_LIP_BOTTOM, w, h),

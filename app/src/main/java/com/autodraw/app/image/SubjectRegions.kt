@@ -56,14 +56,19 @@ data class IntRect(val left: Int, val top: Int, val right: Int, val bottom: Int)
 }
 
 /**
- * 一张人脸的关键点(归一化坐标)。null 表示该部位未检测到。
+ * 一张人脸的关键点(归一化坐标)。
  * 用于生成五官结构引导笔画(避免眼/嘴等被等值线打碎成噪声)。
+ *
+ * 眉毛同时采集上缘([leftBrow]/[rightBrow])和下缘([leftBrowBottom]/
+ * [rightBrowBottom]),配对后可画出有厚度的眉毛,而非单根线。
  */
 data class FaceLandmarks(
     val leftEye: List<PointF> = emptyList(),
     val rightEye: List<PointF> = emptyList(),
     val leftBrow: List<PointF> = emptyList(),
     val rightBrow: List<PointF> = emptyList(),
+    val leftBrowBottom: List<PointF> = emptyList(),
+    val rightBrowBottom: List<PointF> = emptyList(),
     val noseBridge: List<PointF> = emptyList(),
     val upperLip: List<PointF> = emptyList(),
     val lowerLip: List<PointF> = emptyList(),

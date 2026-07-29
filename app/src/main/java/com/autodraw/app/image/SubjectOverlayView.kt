@@ -76,7 +76,9 @@ class SubjectOverlayView @JvmOverloads constructor(
 
         for (lm in subjects.faceLandmarks) {
             listOf(
-                lm.leftEye, lm.rightEye, lm.leftBrow, lm.rightBrow,
+                lm.leftEye, lm.rightEye,
+                lm.leftBrow, lm.rightBrow,
+                lm.leftBrowBottom, lm.rightBrowBottom,  // 眉毛下缘(厚度)
                 lm.noseBridge, lm.upperLip, lm.lowerLip, lm.faceOval
             ).forEach { pts ->
                 drawContour(canvas, pts, ox, oy, sx, sy)

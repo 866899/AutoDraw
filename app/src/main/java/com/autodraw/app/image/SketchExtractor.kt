@@ -47,8 +47,17 @@ class SketchExtractor(private val config: SketchConfig = SketchConfig()) {
         val shadingGray = ImageProcessor.gaussianBlur(gray, w, h, config.blurRadius, 2.0f)
 
         // 把检测到的归一化区域换算到当前 scaled 位图像素坐标
-        val pxBoxes = regions?.boxes?.map { it.toPixels(w, h) } ?: emptyList()
-        val useSubjects = config.subjectBoost && pxBoxes.isNotEmpty()
+        val baseBoxes = regions?.boxes?.map { it.toPixels(w, h) } ?: emptyList()
+        val useSubjects = config.subjectBoost && baseBoxes.isNotEmpty()
+        // 在活物框基础上,叠加由人脸框推导出的"头发区域"(人脸上方扩展带),
+        // 让发际线/发丝也获得加密细节。ML Kit 不提供头发轮廓,此为启发式区域。
+        // 头发区域基于 faceOval 的人脸轮廓归一化坐标推导,不依赖 boxes 顺序。
+        val pxBoxes = if (useSubjects && config.hairBoost && regions != null) {
+            val hairBoxes = regions.faceLandmarks.mapNotNull { lm ->
+                hairRegionFromLandmarks(lm, w, h)
+            }
+            (baseBoxes + hairBoxes).distinct()
+        } else baseBoxes
 
         val inkStrokes = ArrayList<Stroke>()
         val pencilStrokes = ArrayList<Stroke>()
@@ -131,20 +140,94 @@ class SketchExtractor(private val config: SketchConfig = SketchConfig()) {
         // 引导笔画用稍粗的笔触,SKETCH 风格以与 INK 视觉上区分
         val guideWidth = strokeWidthForLevel(0, config.thresholds.size) * 1.15f
         for (lm in regions.faceLandmarks) {
+            // 单根轮廓:眼/鼻/嘴/脸型
             listOf(
-                lm.leftEye, lm.rightEye, lm.leftBrow, lm.rightBrow,
+                lm.leftEye, lm.rightEye,
                 lm.noseBridge, lm.upperLip, lm.lowerLip, lm.faceOval
             ).forEach { pts ->
-                if (pts.size >= 2) {
-                    val scaled = pts.map { PointF(it.x * w, it.y * h) }
-                    val simplified = StrokeSimplifier.simplify(scaled, config.simplifyTol)
-                    if (simplified.size >= 2) {
-                        out.add(toStroke(simplified, w, h, guideWidth, Stroke.Style.SKETCH))
-                    }
-                }
+                out += guideStroke(pts, w, h, guideWidth)
             }
+            // 眉毛:上缘 + 下缘配对,形成有厚度的眉(而非单线)
+            out += pairedBrowStroke(lm.leftBrow, lm.leftBrowBottom, w, h, guideWidth)
+            out += pairedBrowStroke(lm.rightBrow, lm.rightBrowBottom, w, h, guideWidth)
         }
         return out
+    }
+
+    /** 单条轮廓 → 简化后转 SKETCH 笔画。 */
+    private fun guideStroke(
+        pts: List<PointF>, w: Int, h: Int, widthPx: Float
+    ): List<Stroke> {
+        if (pts.size < 2) return emptyList()
+        val scaled = pts.map { PointF(it.x * w, it.y * h) }
+        val simplified = StrokeSimplifier.simplify(scaled, config.simplifyTol)
+        return if (simplified.size >= 2)
+            listOf(toStroke(simplified, w, h, widthPx, Stroke.Style.SKETCH))
+        else emptyList()
+    }
+
+    /**
+     * 眉毛上下缘配对:沿上缘画一笔,再从上缘末端连到下缘末端并反向画下缘,
+     * 形成闭合的"眉形"带,描绘出眉毛的真实厚度。
+     * 若下缘缺失,则退化为只画上缘。
+     */
+    private fun pairedBrowStroke(
+        top: List<PointF>, bottom: List<PointF>,
+        w: Int, h: Int, widthPx: Float
+    ): List<Stroke> {
+        if (top.size < 2) return emptyList()
+        val tol = config.simplifyTol
+        val topPx = top.map { PointF(it.x * w, it.y * h) }
+        val topS = StrokeSimplifier.simplify(topPx, tol)
+        if (topS.size < 2) return emptyList()
+        if (bottom.size < 2) {
+            return listOf(toStroke(topS, w, h, widthPx, Stroke.Style.SKETCH))
+        }
+        val bottomPx = bottom.map { PointF(it.x * w, it.y * h) }
+        val bottomS = StrokeSimplifier.simplify(bottomPx, tol)
+        if (bottomS.size < 2) {
+            return listOf(toStroke(topS, w, h, widthPx, Stroke.Style.SKETCH))
+        }
+        // 闭合带:上缘正向 + 下缘反向 + 回到起点
+        val band = ArrayList<PointF>(topS.size + bottomS.size + 1)
+        band.addAll(topS)
+        band.addAll(bottomS.reversed())
+        band.add(PointF(topS[0].x, topS[0].y)) // 闭合
+        val bandS = StrokeSimplifier.simplify(band, tol)
+        return if (bandS.size >= 2)
+            listOf(toStroke(bandS, w, h, widthPx, Stroke.Style.SKETCH))
+        else listOf(toStroke(topS, w, h, widthPx, Stroke.Style.SKETCH))
+    }
+
+    /**
+     * 由人脸轮廓 [FaceLandmarks.faceOval] 推导头发区域(归一化→像素):
+     * 取人脸最上方点,向上扩展 [SketchConfig.hairTopRatio] 个人脸高度,
+     * 左右各扩 [SketchConfig.hairSideRatio] 个人脸宽度。夹到画布内。
+     * 返回 null 表示无法推导(无 faceOval)。
+     */
+    private fun hairRegionFromLandmarks(lm: FaceLandmarks, w: Int, h: Int): IntRect? {
+        val oval = lm.faceOval
+        if (oval.size < 3) return null
+        var minX = 1f; var maxX = 0f; var minY = 1f; var maxY = 0f
+        for (p in oval) {
+            if (p.x < minX) minX = p.x
+            if (p.x > maxX) maxX = p.x
+            if (p.y < minY) minY = p.y
+            if (p.y > maxY) maxY = p.y
+        }
+        val faceW = (maxX - minX).coerceAtLeast(0.01f)
+        val faceH = (maxY - minY).coerceAtLeast(0.01f)
+        // 头发区:从人脸顶部向上扩 faceH * hairTopRatio,左右扩 faceW * hairSideRatio
+        val left = (minX - faceW * config.hairSideRatio).coerceIn(0f, 1f)
+        val right = (maxX + faceW * config.hairSideRatio).coerceIn(0f, 1f)
+        val top = (minY - faceH * config.hairTopRatio).coerceIn(0f, 1f)
+        val bottom = maxY // 头发区底部 = 人脸底部(覆盖整个头部,含侧鬓)
+        return IntRect(
+            (left * w).toInt().coerceIn(0, w),
+            (top * h).toInt().coerceIn(0, h),
+            (right * w).toInt().coerceIn(0, w),
+            (bottom * h).toInt().coerceIn(0, h)
+        )
     }
 
     /** 折线质心是否落在任一活物像素框内。 */
